@@ -7,6 +7,7 @@ var canvas = require('canvas');
 var solarLunar = require('solarlunar');
 var request = require('request')
 var bmp = require('fast-bmp');
+var path = require('path');
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -73,6 +74,10 @@ if (fs.existsSync(config.backupChangesFile)) {
 }
 
 initRotate();
+
+app.get('/', function (req, res) {
+    res.sendFile(path.join(__dirname + '/index.html'));
+});
 
 app.post('/set', function (req, res) {
     for (let i in req.body) {
@@ -534,7 +539,7 @@ function backupDaily(){
         fs.mkdirSync(daily.dir);
     }
     for (let key in daily.changes) {
-        fs.writeFileSync(daily.dir + key + '.json', JSON.stringify(daily.changes[key]));
+        fs.writeFileSync(daily.dir + '/' + key + '.json', JSON.stringify(daily.changes[key]));
     }
 }
 
@@ -566,19 +571,24 @@ function quickBackup(){
 }
 
 function reportTemp () {
-    let timeStart = new Date().getTime();
-    let fileContent = fs.readFileSync(w1DeviceFile).toString();
-    let temp = fileContent.match(/t=(\d+)/)[1];
-    console.log('Temp reading cost: ' + (new Date().getTime() - timeStart) + 'ms');
-    timeStart = new Date().getTime();
-    console.log('Temp read at ' + new Date().toString())
-    valuesMap[config.tempKey] = {
-        value: parseInt(temp),
-        updated: (new Date()).getTime()
-    };
-    process.nextTick(function () {
-        addChange(config.tempKey);
-    });
+    // DS18B20 may lost connect
+    if(fs.existsSync(w1DeviceFile)){
+        let timeStart = new Date().getTime();
+        let fileContent = fs.readFileSync(w1DeviceFile).toString();
+        let temp = fileContent.match(/t=(\d+)/)[1];
+        console.log('Temp reading cost: ' + (new Date().getTime() - timeStart) + 'ms');
+        timeStart = new Date().getTime();
+        console.log('Temp read at ' + new Date().toString() + ', value: ' + temp);
+        valuesMap[config.tempKey] = {
+            value: parseInt(temp),
+            updated: (new Date()).getTime()
+        };
+        process.nextTick(function () {
+            addChange(config.tempKey);
+        });
+    }else{
+        console.log('Temp read failed at ' + new Date().toString())
+    }
     setTimeout(reportTemp, 10000);
 }
 
